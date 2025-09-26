@@ -1,15 +1,18 @@
 use socketcan::tokio::CanSocket;
+use std::collections::HashMap;
 use std::env;
+use std::time::Instant;
 
 use color_eyre::Result;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use futures::{FutureExt, StreamExt};
 use ratatui::{
-    DefaultTerminal, Frame,
+    DefaultTerminal, Frame as AppFrame,
     style::Stylize,
     text::Line,
     widgets::{Block, Paragraph},
 };
+use socketcan::{CanFrame, EmbeddedFrame, Frame};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -20,13 +23,22 @@ async fn main() -> Result<()> {
     result
 }
 
+#[derive(Debug, Clone)]
+struct FrameStats {
+    count: u32,
+    last_time: f64,
+    last_dt: f64,
+    last_frame: CanFrame,
+}
+
 #[derive(Debug)]
 pub struct App {
     running: bool,
     paused: bool,
     event_stream: EventStream,
     can_socket: CanSocket,
-    can_frames: Vec<String>,
+    frame_stats: HashMap<u32, FrameStats>,
+    start_time: Instant,
 }
 
 impl App {
@@ -40,7 +52,8 @@ impl App {
             paused: false,
             event_stream: EventStream::new(),
             can_socket,
-            can_frames: Vec::new(),
+            frame_stats: HashMap::new(),
+            start_time: Instant::now(),
         })
     }
 
@@ -68,18 +81,30 @@ impl App {
                     match res {
                         Ok(frame) => {
                             if !self.paused {
-                                let frame_str = format!("{frame:?}");
-                                self.can_frames.push(frame_str);
-                                // Keep only last 100 frames to prevent memory growth
-                                if self.can_frames.len() > 100 {
-                                    self.can_frames.remove(0);
-                                }
+                                let current_time = self.start_time.elapsed().as_secs_f64();
+                                let frame_id = frame.can_id().as_raw();
+
+                                let dt = if let Some(stats) = self.frame_stats.get(&frame_id) {
+                                    current_time - stats.last_time
+                                } else {
+                                    0.0
+                                };
+
+                                let stats = self.frame_stats.entry(frame_id).or_insert(FrameStats {
+                                    count: 0,
+                                    last_time: 0.0,
+                                    last_dt: 0.0,
+                                    last_frame: frame.clone(),
+                                });
+
+                                stats.count += 1;
+                                stats.last_dt = dt;
+                                stats.last_time = current_time;
+                                stats.last_frame = frame;
                             }
                         }
-                        Err(err) => {
-                            if !self.paused {
-                                self.can_frames.push(format!("Error: {err}"));
-                            }
+                        Err(_err) => {
+                            // Handle error if needed
                         }
                     }
                 }
@@ -88,23 +113,47 @@ impl App {
         Ok(())
     }
 
-    fn draw(&mut self, frame: &mut Frame) {
+    fn draw(&mut self, frame: &mut AppFrame) {
         let title = Line::from("CAN Frame Monitor").bold().blue().centered();
 
-        let frames_text = if self.can_frames.is_empty() {
+        let mut lines = vec!["Count   Time        dt        ID     DLC  Data".to_string()];
+
+        // Sort by frame ID for consistent display
+        let mut sorted_frames: Vec<_> = self.frame_stats.iter().collect();
+        sorted_frames.sort_by_key(|(id, _)| *id);
+
+        for (id, stats) in sorted_frames {
+            let data_hex = stats
+                .last_frame
+                .data()
+                .iter()
+                .map(|b| format!("{:02X}", b))
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            let line = format!(
+                "{:<7} {:<11.6} {:<9.6} 0x{:03X}  {:<3} {}",
+                stats.count,
+                stats.last_time,
+                stats.last_dt,
+                id,
+                stats.last_frame.dlc(),
+                data_hex
+            );
+            lines.push(line);
+        }
+
+        let text = if lines.len() == 1 {
             "Waiting for CAN frames...".to_string()
         } else {
-            self.can_frames.join("\n")
+            lines.join("\n")
         };
 
         frame.render_widget(
-            Paragraph::new(frames_text)
+            Paragraph::new(text)
                 .block(Block::bordered().title(title))
                 .scroll((
-                    self.can_frames
-                        .len()
-                        .saturating_sub(frame.area().height as usize - 2)
-                        as u16,
+                    lines.len().saturating_sub(frame.area().height as usize - 2) as u16,
                     0,
                 )),
             frame.area(),
