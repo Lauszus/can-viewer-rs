@@ -23,6 +23,7 @@ async fn main() -> Result<()> {
 #[derive(Debug)]
 pub struct App {
     running: bool,
+    paused: bool,
     event_stream: EventStream,
     can_socket: CanSocket,
     can_frames: Vec<String>,
@@ -36,6 +37,7 @@ impl App {
 
         Ok(Self {
             running: false,
+            paused: false,
             event_stream: EventStream::new(),
             can_socket,
             can_frames: Vec::new(),
@@ -65,15 +67,19 @@ impl App {
                 if let Some(res) = can_result {
                     match res {
                         Ok(frame) => {
-                            let frame_str = format!("{frame:?}");
-                            self.can_frames.push(frame_str);
-                            // Keep only last 100 frames to prevent memory growth
-                            if self.can_frames.len() > 100 {
-                                self.can_frames.remove(0);
+                            if !self.paused {
+                                let frame_str = format!("{frame:?}");
+                                self.can_frames.push(frame_str);
+                                // Keep only last 100 frames to prevent memory growth
+                                if self.can_frames.len() > 100 {
+                                    self.can_frames.remove(0);
+                                }
                             }
                         }
                         Err(err) => {
-                            self.can_frames.push(format!("Error: {err}"));
+                            if !self.paused {
+                                self.can_frames.push(format!("Error: {err}"));
+                            }
                         }
                     }
                 }
@@ -109,6 +115,9 @@ impl App {
         match (key.modifiers, key.code) {
             (_, KeyCode::Esc | KeyCode::Char('q'))
             | (KeyModifiers::CONTROL, KeyCode::Char('c' | 'C')) => self.quit(),
+            (_, KeyCode::Char('p' | 'P' | ' ')) => {
+                self.paused = !self.paused;
+            }
             _ => {}
         }
     }
