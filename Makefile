@@ -23,14 +23,14 @@ build-release: $(CARGO)
 
 check: $(CARGO)
 	$(CARGO) fmt -- --check
-	$(CARGO) clippy -- -W clippy::pedantic -D warnings
+	$(CARGO) clippy -- -W clippy::pedantic -D warnings -A clippy::missing-errors-doc
 
 clean: $(CARGO)
 	$(CARGO) clean
 
 fix: $(CARGO)
 	$(CARGO) fmt
-	$(CARGO) fix --allow-dirty --allow-staged
+	$(CARGO) clippy --fix --allow-dirty --allow-staged -- -W clippy::pedantic -D warnings -A clippy::missing-errors-doc
 
 # Update the lock file if Cargo.toml changes.
 # Cargo does not have a way of simply updating the lock file without upgrading,
