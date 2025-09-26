@@ -1,7 +1,8 @@
-.PHONY: static-checks cargo build-debug build-release check clean fix lock lock-upgrade run test
+.PHONY: cargo build-debug build-release check clean fix lock lock-upgrade run test
 
 # This is the first target, so it is run if "make" is called without arguments.
-static-checks: check
+run: $(CARGO)
+	$(CARGO) run
 
 # Path to cargo.
 CARGO ?= $(shell which cargo 2>/dev/null || echo "$(HOME)/.cargo/bin/cargo")
@@ -42,9 +43,6 @@ lock: Cargo.lock
 # Upgrade the Cargo lock file.
 lock-upgrade: Cargo.lock
 	$(CARGO) generate-lockfile
-
-run: $(CARGO)
-	$(CARGO) run
 
 test: $(CARGO)
 	$(CARGO) test
