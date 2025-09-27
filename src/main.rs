@@ -1,5 +1,4 @@
 use socketcan::tokio::CanSocket;
-use std::collections::HashMap;
 use std::env;
 use std::time::Instant;
 
@@ -37,12 +36,11 @@ pub struct App {
     paused: bool,
     event_stream: EventStream,
     can_socket: CanSocket,
-    frame_stats: HashMap<u32, FrameStats>,
+    frame_stats: Vec<(u32, FrameStats)>,
     start_time: Instant,
 }
 
 impl App {
-    #[must_use]
     pub fn new() -> Result<Self> {
         let iface = env::args().nth(1).unwrap_or_else(|| "vcan0".into());
         let can_socket = CanSocket::open(&iface)?;
@@ -52,7 +50,7 @@ impl App {
             paused: false,
             event_stream: EventStream::new(),
             can_socket,
-            frame_stats: HashMap::new(),
+            frame_stats: Vec::new(),
             start_time: Instant::now(),
         })
     }
@@ -84,23 +82,20 @@ impl App {
                                 let current_time = self.start_time.elapsed().as_secs_f64();
                                 let frame_id = frame.can_id().as_raw();
 
-                                let dt = if let Some(stats) = self.frame_stats.get(&frame_id) {
-                                    current_time - stats.last_time
+                                if let Some((_, stats)) = self.frame_stats.iter_mut().find(|(id, _)| *id == frame_id) {
+                                    let dt = current_time - stats.last_time;
+                                    stats.count += 1;
+                                    stats.last_dt = dt;
+                                    stats.last_time = current_time;
+                                    stats.last_frame = frame;
                                 } else {
-                                    0.0
-                                };
-
-                                let stats = self.frame_stats.entry(frame_id).or_insert(FrameStats {
-                                    count: 0,
-                                    last_time: 0.0,
-                                    last_dt: 0.0,
-                                    last_frame: frame,
-                                });
-
-                                stats.count += 1;
-                                stats.last_dt = dt;
-                                stats.last_time = current_time;
-                                stats.last_frame = frame;
+                                    self.frame_stats.push((frame_id, FrameStats {
+                                        count: 1,
+                                        last_time: current_time,
+                                        last_dt: 0.0,
+                                        last_frame: frame,
+                                    }));
+                                }
                             }
                         }
                         Err(_err) => {
@@ -119,11 +114,7 @@ impl App {
         let header = Line::from("Count   Time        dt         ID          DLC  Data").bold();
         let mut lines = vec![header];
 
-        // Sort by frame ID for consistent display
-        let mut sorted_frames: Vec<_> = self.frame_stats.iter().collect();
-        sorted_frames.sort_by_key(|(id, _)| *id);
-
-        for (id, stats) in sorted_frames {
+        for (id, stats) in &self.frame_stats {
             let data_hex = stats
                 .last_frame
                 .data()
@@ -138,9 +129,9 @@ impl App {
                 stats.last_time,
                 stats.last_dt,
                 if stats.last_frame.is_extended() {
-                    format!("0x{:08X}", id)
+                    format!("0x{id:08X}")
                 } else {
-                    format!("0x{:03X}", id)
+                    format!("0x{id:03X}")
                 },
                 stats.last_frame.dlc(),
                 data_hex
@@ -158,7 +149,8 @@ impl App {
             Paragraph::new(text)
                 .block(Block::bordered().title(title))
                 .scroll((
-                    lines.len().saturating_sub(frame.area().height as usize - 2) as u16,
+                    u16::try_from(lines.len().saturating_sub(frame.area().height as usize - 2))
+                        .unwrap(),
                     0,
                 )),
             frame.area(),
@@ -171,6 +163,9 @@ impl App {
             | (KeyModifiers::CONTROL, KeyCode::Char('c' | 'C')) => self.quit(),
             (_, KeyCode::Char('p' | 'P' | ' ')) => {
                 self.paused = !self.paused;
+            }
+            (_, KeyCode::Char('s' | 'S')) => {
+                self.frame_stats.sort_by_key(|(id, _)| *id);
             }
             _ => {}
         }
