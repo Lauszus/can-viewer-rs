@@ -81,12 +81,12 @@ impl App {
 
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
         self.running = true;
-        let mut last_update = Instant::now();
         let render_interval = Duration::from_secs_f64(1.0 / self.frame_rate);
+        let mut last_update: Option<Instant> = None;
         while self.running {
-            if last_update.elapsed() >= render_interval {
+            if last_update.is_none_or(|last| last.elapsed() >= render_interval) {
                 terminal.draw(|frame| self.draw(frame))?;
-                last_update = Instant::now();
+                last_update = Some(Instant::now());
             }
             self.handle_events().await?;
         }
@@ -166,14 +166,8 @@ impl App {
             lines.push(Line::from(line_text));
         }
 
-        let text = if lines.len() == 1 {
-            vec![Line::from("Waiting for CAN frames...")]
-        } else {
-            lines.clone()
-        };
-
         frame.render_widget(
-            Paragraph::new(text).scroll((
+            Paragraph::new(lines.clone()).scroll((
                 u16::try_from(lines.len().saturating_sub(frame.area().height as usize - 2))
                     .unwrap(),
                 0,
