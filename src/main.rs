@@ -185,6 +185,9 @@ impl App {
             (_, KeyCode::Char('s' | 'S')) => {
                 self.frame_stats.sort_by_key(|(id, _)| *id);
             }
+            (_, KeyCode::Char('c' | 'C')) => {
+                self.frame_stats.clear();
+            }
             _ => {}
         }
     }
