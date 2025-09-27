@@ -6,7 +6,7 @@ use ratatui::{DefaultTerminal, Frame as AppFrame, style::Stylize, text::Line, wi
 use socketcan::tokio::CanSocket;
 use socketcan::{CanFrame, EmbeddedFrame, Frame};
 use std::env;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -34,6 +34,7 @@ pub struct App {
     can_socket: CanSocket,
     frame_stats: Vec<(u32, FrameStats)>,
     start_time: Instant,
+    frame_rate: f64,
 }
 
 impl App {
@@ -74,13 +75,19 @@ impl App {
             can_socket,
             frame_stats: Vec::new(),
             start_time: Instant::now(),
+            frame_rate: 60.0, // 60 FPS
         })
     }
 
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
         self.running = true;
+        let mut last_update = Instant::now();
+        let render_interval = Duration::from_secs_f64(1.0 / self.frame_rate);
         while self.running {
-            terminal.draw(|frame| self.draw(frame))?;
+            if last_update.elapsed() >= render_interval {
+                terminal.draw(|frame| self.draw(frame))?;
+                last_update = Instant::now();
+            }
             self.handle_events().await?;
         }
         Ok(())
