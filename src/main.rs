@@ -116,7 +116,8 @@ impl App {
     fn draw(&mut self, frame: &mut AppFrame) {
         let title = Line::from("CAN Frame Monitor").bold().blue().centered();
 
-        let mut lines = vec!["Count   Time        dt         ID          DLC  Data".to_string()];
+        let header = Line::from("Count   Time        dt         ID          DLC  Data").bold();
+        let mut lines = vec![header];
 
         // Sort by frame ID for consistent display
         let mut sorted_frames: Vec<_> = self.frame_stats.iter().collect();
@@ -131,7 +132,7 @@ impl App {
                 .collect::<Vec<_>>()
                 .join(" ");
 
-            let line = format!(
+            let line_text = format!(
                 "{:<7} {:<11.6} {:<10.6} {:<11} {:<3} {}",
                 stats.count,
                 stats.last_time,
@@ -144,13 +145,13 @@ impl App {
                 stats.last_frame.dlc(),
                 data_hex
             );
-            lines.push(line);
+            lines.push(Line::from(line_text));
         }
 
         let text = if lines.len() == 1 {
-            "Waiting for CAN frames...".to_string()
+            vec![Line::from("Waiting for CAN frames...")]
         } else {
-            lines.join("\n")
+            lines.clone()
         };
 
         frame.render_widget(
