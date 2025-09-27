@@ -94,7 +94,7 @@ impl App {
                                     count: 0,
                                     last_time: 0.0,
                                     last_dt: 0.0,
-                                    last_frame: frame.clone(),
+                                    last_frame: frame,
                                 });
 
                                 stats.count += 1;
@@ -116,7 +116,7 @@ impl App {
     fn draw(&mut self, frame: &mut AppFrame) {
         let title = Line::from("CAN Frame Monitor").bold().blue().centered();
 
-        let mut lines = vec!["Count   Time        dt        ID     DLC  Data".to_string()];
+        let mut lines = vec!["Count   Time        dt         ID          DLC  Data".to_string()];
 
         // Sort by frame ID for consistent display
         let mut sorted_frames: Vec<_> = self.frame_stats.iter().collect();
@@ -127,16 +127,20 @@ impl App {
                 .last_frame
                 .data()
                 .iter()
-                .map(|b| format!("{:02X}", b))
+                .map(|b| format!("{b:02X}"))
                 .collect::<Vec<_>>()
                 .join(" ");
 
             let line = format!(
-                "{:<7} {:<11.6} {:<9.6} 0x{:03X}  {:<3} {}",
+                "{:<7} {:<11.6} {:<10.6} {:<11} {:<3} {}",
                 stats.count,
                 stats.last_time,
                 stats.last_dt,
-                id,
+                if stats.last_frame.is_extended() {
+                    format!("0x{:08X}", id)
+                } else {
+                    format!("0x{:03X}", id)
+                },
                 stats.last_frame.dlc(),
                 data_hex
             );
