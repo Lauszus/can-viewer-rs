@@ -1,14 +1,8 @@
 use color_eyre::Result;
-use colored::Colorize; // Add this back for error output
+use colored::Colorize;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use futures::{FutureExt, StreamExt};
-use ratatui::{
-    DefaultTerminal,
-    Frame as AppFrame,
-    style::{Color, Stylize}, // Use both Color and Stylize from ratatui
-    text::Line,
-    widgets::{Block, Paragraph},
-};
+use ratatui::{DefaultTerminal, Frame as AppFrame, style::Stylize, text::Line, widgets::Paragraph};
 use socketcan::tokio::CanSocket;
 use socketcan::{CanFrame, EmbeddedFrame, Frame};
 use std::env;
@@ -137,11 +131,6 @@ impl App {
     }
 
     fn draw(&mut self, frame: &mut AppFrame) {
-        let title = Line::from("CAN Frame Monitor")
-            .bold()
-            .fg(Color::Blue) // Use ratatui's Color::Blue instead of .blue()
-            .centered();
-
         let header = Line::from("Count   Time        dt         ID          DLC  Data").bold();
         let mut lines = vec![header];
 
@@ -177,13 +166,11 @@ impl App {
         };
 
         frame.render_widget(
-            Paragraph::new(text)
-                .block(Block::bordered().title(title))
-                .scroll((
-                    u16::try_from(lines.len().saturating_sub(frame.area().height as usize - 2))
-                        .unwrap(),
-                    0,
-                )),
+            Paragraph::new(text).scroll((
+                u16::try_from(lines.len().saturating_sub(frame.area().height as usize - 2))
+                    .unwrap(),
+                0,
+            )),
             frame.area(),
         );
     }
