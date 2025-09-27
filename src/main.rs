@@ -131,7 +131,7 @@ impl App {
     }
 
     fn draw(&mut self, frame: &mut AppFrame) {
-        let header = Line::from("Count   Time        dt         ID          DLC  Data").bold();
+        let header = Line::from("Count   Time           dt          ID          DLC  Data").bold();
         let mut lines = vec![header];
 
         for (id, stats) in &self.frame_stats {
@@ -144,7 +144,7 @@ impl App {
                 .join(" ");
 
             let line_text = format!(
-                "{:<7} {:<11.6} {:<10.6} {:<11} {:<3} {}",
+                "{:<7} {:<14.6} {:<11.6} {:<11} {:<4} {}",
                 stats.count,
                 stats.last_time,
                 stats.last_dt,
