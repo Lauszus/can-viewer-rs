@@ -1,23 +1,25 @@
-use socketcan::tokio::CanSocket;
-use std::env;
-use std::time::Instant;
-
 use color_eyre::Result;
+use colored::Colorize; // Add this back for error output
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use futures::{FutureExt, StreamExt};
 use ratatui::{
-    DefaultTerminal, Frame as AppFrame,
-    style::Stylize,
+    DefaultTerminal,
+    Frame as AppFrame,
+    style::{Color, Stylize}, // Use both Color and Stylize from ratatui
     text::Line,
     widgets::{Block, Paragraph},
 };
+use socketcan::tokio::CanSocket;
 use socketcan::{CanFrame, EmbeddedFrame, Frame};
+use std::env;
+use std::time::Instant;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
+    let app = App::new()?;
     let terminal = ratatui::init();
-    let result = App::new()?.run(terminal).await;
+    let result = app.run(terminal).await;
     ratatui::restore();
     result
 }
@@ -43,7 +45,33 @@ pub struct App {
 impl App {
     pub fn new() -> Result<Self> {
         let iface = env::args().nth(1).unwrap_or_else(|| "vcan0".into());
-        let can_socket = CanSocket::open(&iface)?;
+        let can_socket = match CanSocket::open(&iface) {
+            Ok(socket) => socket,
+            Err(e) => {
+                eprintln!(
+                    "{} '{}':",
+                    Colorize::bold("Failed to open CAN interface").red(),
+                    iface.clone().yellow()
+                );
+                eprintln!("  {}", e.to_string().red());
+                eprintln!();
+                eprintln!("{}:", Colorize::bold("Please check that").cyan());
+                eprintln!(
+                    "  - The interface exists (try: {})",
+                    format!("ip link show {iface}").green()
+                );
+                eprintln!("  - You have sufficient permissions");
+                eprintln!(
+                    "  - The interface is up: {}",
+                    format!(
+                        "sudo ip link add dev {iface} type vcan && sudo ip link set up {iface}"
+                    )
+                    .green()
+                );
+
+                std::process::exit(1);
+            }
+        };
 
         Ok(Self {
             running: false,
@@ -109,7 +137,10 @@ impl App {
     }
 
     fn draw(&mut self, frame: &mut AppFrame) {
-        let title = Line::from("CAN Frame Monitor").bold().blue().centered();
+        let title = Line::from("CAN Frame Monitor")
+            .bold()
+            .fg(Color::Blue) // Use ratatui's Color::Blue instead of .blue()
+            .centered();
 
         let header = Line::from("Count   Time        dt         ID          DLC  Data").bold();
         let mut lines = vec![header];
