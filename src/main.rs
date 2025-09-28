@@ -1,3 +1,6 @@
+mod style;
+
+use clap::Parser;
 use color_eyre::Result;
 use colored::Colorize;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
@@ -6,17 +9,60 @@ use indexmap::IndexMap;
 use ratatui::{DefaultTerminal, Frame as AppFrame, style::Stylize, text::Line, widgets::Paragraph};
 use socketcan::tokio::CanSocket;
 use socketcan::{CanFrame, EmbeddedFrame, Frame};
-use std::env;
 use std::time::{Duration, Instant};
+
+/// A CAN frame viewer for Linux `SocketCAN`
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+#[clap(styles = style::CARGO_STYLING)]
+struct Args {
+    /// CAN interface to use
+    #[arg(short, long)]
+    channel: String,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
-    let app = App::new()?;
+
+    let args = Args::parse();
+    let can_socket = open_can_socket(&args.channel);
+
+    let app = App::new(can_socket);
     let terminal = ratatui::init();
     let result = app.run(terminal).await;
     ratatui::restore();
+
     result
+}
+
+fn open_can_socket(channel: &String) -> CanSocket {
+    match CanSocket::open(channel) {
+        Ok(socket) => socket,
+        Err(e) => {
+            eprintln!(
+                "{} '{}':",
+                Colorize::bold("Failed to open CAN interface").red(),
+                channel.clone().yellow()
+            );
+            eprintln!("  {}", e.to_string().red());
+            eprintln!();
+            eprintln!("{}:", Colorize::bold("Please check that").cyan());
+            eprintln!(
+                "  - The interface exists (try: {})",
+                format!("ip link show {channel}").green()
+            );
+            eprintln!("  - You have sufficient permissions");
+            eprintln!(
+                "  - The interface is up: {}",
+                format!(
+                    "sudo ip link add dev {channel} type vcan && sudo ip link set up {channel}"
+                )
+                .green()
+            );
+            std::process::exit(1);
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -40,37 +86,9 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Result<Self> {
-        let iface = env::args().nth(1).unwrap_or_else(|| "vcan0".into());
-        let can_socket = match CanSocket::open(&iface) {
-            Ok(socket) => socket,
-            Err(e) => {
-                eprintln!(
-                    "{} '{}':",
-                    Colorize::bold("Failed to open CAN interface").red(),
-                    iface.clone().yellow()
-                );
-                eprintln!("  {}", e.to_string().red());
-                eprintln!();
-                eprintln!("{}:", Colorize::bold("Please check that").cyan());
-                eprintln!(
-                    "  - The interface exists (try: {})",
-                    format!("ip link show {iface}").green()
-                );
-                eprintln!("  - You have sufficient permissions");
-                eprintln!(
-                    "  - The interface is up: {}",
-                    format!(
-                        "sudo ip link add dev {iface} type vcan && sudo ip link set up {iface}"
-                    )
-                    .green()
-                );
-
-                std::process::exit(1);
-            }
-        };
-
-        Ok(Self {
+    #[must_use]
+    pub fn new(can_socket: CanSocket) -> Self {
+        Self {
             running: false,
             paused: false,
             event_stream: EventStream::new(),
@@ -79,7 +97,7 @@ impl App {
             start_time: Instant::now(),
             frame_rate: 60.0, // 60 FPS
             scroll_offset: 0,
-        })
+        }
     }
 
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {

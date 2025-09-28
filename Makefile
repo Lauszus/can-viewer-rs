@@ -2,7 +2,7 @@
 
 # This is the first target, so it is run if "make" is called without arguments.
 run: $(CARGO)
-	$(CARGO) run
+	$(CARGO) run -- --channel vcan0
 
 # Path to cargo.
 CARGO ?= $(shell which cargo 2>/dev/null || echo "$(HOME)/.cargo/bin/cargo")
