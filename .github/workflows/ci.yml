@@ -35,4 +35,4 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run checks
-        run: make check
+        run: make -j check

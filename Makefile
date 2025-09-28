@@ -1,4 +1,4 @@
-.PHONY: cargo build-debug build-release check clean fix lock lock-upgrade run test
+.PHONY: cargo build-debug build-release check check-clippy check-fmt clean fix fix-clippy fix-fmt lock lock-upgrade run test
 
 # This is the first target, so it is run if "make" is called without arguments.
 run: $(CARGO)
@@ -21,16 +21,24 @@ build-debug: $(CARGO)
 build-release: $(CARGO)
 	$(CARGO) build --release
 
-check: $(CARGO)
-	$(CARGO) fmt -- --check
+check: check-fmt check-clippy
+
+check-clippy: $(CARGO)
 	$(CARGO) clippy -- -W clippy::pedantic -D warnings -A clippy::missing-errors-doc
+
+check-fmt: $(CARGO)
+	$(CARGO) fmt -- --check
 
 clean: $(CARGO)
 	$(CARGO) clean
 
-fix: $(CARGO)
-	$(CARGO) fmt
+fix: fix-clippy fix-fmt
+
+fix-clippy: $(CARGO)
 	$(CARGO) clippy --fix --allow-dirty --allow-staged -- -W clippy::pedantic -D warnings -A clippy::missing-errors-doc
+
+fix-fmt: $(CARGO)
+	$(CARGO) fmt
 
 # Update the lock file if Cargo.toml changes.
 # Cargo does not have a way of simply updating the lock file without upgrading,
