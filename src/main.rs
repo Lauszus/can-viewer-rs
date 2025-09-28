@@ -6,7 +6,13 @@ use colored::Colorize;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use futures::{FutureExt, StreamExt};
 use indexmap::IndexMap;
-use ratatui::{DefaultTerminal, Frame as AppFrame, style::Stylize, text::Line, widgets::Paragraph};
+use ratatui::{
+    DefaultTerminal, Frame as AppFrame,
+    layout::{Alignment, Rect},
+    style::{Color, Style, Stylize},
+    text::Line,
+    widgets::{Block, Borders, Clear, Paragraph},
+};
 use socketcan::tokio::CanSocket;
 use socketcan::{CanFrame, EmbeddedFrame, Frame};
 use std::time::{Duration, Instant};
@@ -77,6 +83,7 @@ struct FrameStats {
 pub struct App {
     running: bool,
     paused: bool,
+    show_shortcuts: bool,
     event_stream: EventStream,
     can_socket: CanSocket,
     frame_stats: IndexMap<(u32, usize), FrameStats>,
@@ -91,6 +98,7 @@ impl App {
         Self {
             running: false,
             paused: false,
+            show_shortcuts: false,
             event_stream: EventStream::new(),
             can_socket,
             frame_stats: IndexMap::new(),
@@ -207,6 +215,66 @@ impl App {
             Paragraph::new(lines.clone()).scroll((self.scroll_offset, 0)),
             frame.area(),
         );
+
+        // Draw shortcuts help overlay
+        if self.show_shortcuts {
+            Self::draw_shortcuts_popup(frame);
+        }
+    }
+
+    fn draw_shortcuts_popup(frame: &mut AppFrame) {
+        // Create the shortcuts content with proper table formatting
+        let lines = vec![
+            Line::from("┌──────────┬──────────────────────────┐"),
+            Line::from("│   Key    │         Description      │").bold(),
+            Line::from("├──────────┼──────────────────────────┤"),
+            Line::from("│ ESC/q    │ Quit                     │"),
+            Line::from("│ SPACE    │ Pause/Resume             │"),
+            Line::from("│ s        │ Sort frames              │"),
+            Line::from("│ c        │ Clear frames             │"),
+            Line::from("│ ↑ ↓      │ Scroll                   │"),
+            Line::from("│ h        │ Toggle help (this popup) │"),
+            Line::from("└──────────┴──────────────────────────┘"),
+        ];
+
+        // Calculate exact dimensions needed
+        let content_width = u16::try_from(lines[0].width()).unwrap();
+        let content_height = u16::try_from(lines.len()).unwrap();
+        let border_width = 2; // Left and right borders
+        let border_height = 2; // Top and bottom borders
+
+        let popup_width = content_width + border_width;
+        let popup_height = content_height + border_height;
+
+        // Create a rectangle for the popup in the top-right corner
+        let popup_area = Self::sized_top_right_rect(popup_width, popup_height, frame.area());
+
+        // Clear the area for the popup
+        frame.render_widget(Clear, popup_area);
+
+        let block = Block::default()
+            .title(" Shortcuts ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan));
+
+        let paragraph = Paragraph::new(lines)
+            .block(block)
+            .alignment(Alignment::Left);
+
+        frame.render_widget(paragraph, popup_area);
+    }
+
+    /// Helper function to create a centered rectangle with exact dimensions
+    fn sized_top_right_rect(width: u16, height: u16, r: Rect) -> Rect {
+        let x = r.width.saturating_sub(width);
+        let y = 0;
+
+        Rect {
+            x,
+            y,
+            width: width.min(r.width),
+            height: height.min(r.height),
+        }
     }
 
     fn on_key_event(&mut self, key: KeyEvent) {
@@ -221,7 +289,7 @@ impl App {
             }
             (_, KeyCode::Esc | KeyCode::Char('q'))
             | (KeyModifiers::CONTROL, KeyCode::Char('c' | 'C')) => self.quit(),
-            (_, KeyCode::Char('p' | 'P' | ' ')) => {
+            (_, KeyCode::Char(' ')) => {
                 self.paused = !self.paused;
             }
             (_, KeyCode::Char('s' | 'S')) => {
@@ -233,6 +301,9 @@ impl App {
                 self.frame_stats.clear();
                 self.start_time = Instant::now();
                 self.scroll_offset = 0;
+            }
+            (_, KeyCode::Char('h' | 'H')) => {
+                self.show_shortcuts = !self.show_shortcuts;
             }
             _ => {}
         }
