@@ -36,6 +36,7 @@ pub struct App {
     frame_stats: IndexMap<(u32, usize), FrameStats>,
     start_time: Instant,
     frame_rate: f64,
+    scroll_offset: u16, // Track scroll position
 }
 
 impl App {
@@ -77,6 +78,7 @@ impl App {
             frame_stats: IndexMap::new(),
             start_time: Instant::now(),
             frame_rate: 60.0, // 60 FPS
+            scroll_offset: 0,
         })
     }
 
@@ -175,18 +177,30 @@ impl App {
             }
         }
 
+        // Limit scrolling, so the maximum scrolling position is one below the last line
+        let max_scroll =
+            u16::try_from(lines.len().saturating_sub(frame.area().height as usize - 1))
+                .unwrap_or(0);
+        if self.scroll_offset > max_scroll {
+            self.scroll_offset = max_scroll;
+        }
+
         frame.render_widget(
-            Paragraph::new(lines.clone()).scroll((
-                u16::try_from(lines.len().saturating_sub(frame.area().height as usize - 2))
-                    .unwrap(),
-                0,
-            )),
+            Paragraph::new(lines.clone()).scroll((self.scroll_offset, 0)),
             frame.area(),
         );
     }
 
     fn on_key_event(&mut self, key: KeyEvent) {
         match (key.modifiers, key.code) {
+            (_, KeyCode::Up) => {
+                if self.scroll_offset > 0 {
+                    self.scroll_offset -= 1;
+                }
+            }
+            (_, KeyCode::Down) => {
+                self.scroll_offset += 1;
+            }
             (_, KeyCode::Esc | KeyCode::Char('q'))
             | (KeyModifiers::CONTROL, KeyCode::Char('c' | 'C')) => self.quit(),
             (_, KeyCode::Char('p' | 'P' | ' ')) => {
@@ -199,6 +213,7 @@ impl App {
             }
             (_, KeyCode::Char('c' | 'C')) => {
                 self.frame_stats.clear();
+                self.scroll_offset = 0;
             }
             _ => {}
         }
