@@ -213,6 +213,7 @@ impl App {
             }
             (_, KeyCode::Char('c' | 'C')) => {
                 self.frame_stats.clear();
+                self.start_time = Instant::now();
                 self.scroll_offset = 0;
             }
             _ => {}
