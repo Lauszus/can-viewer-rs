@@ -17,9 +17,28 @@ use socketcan::tokio::CanSocket;
 use socketcan::{CanFrame, EmbeddedFrame, Frame};
 use std::time::{Duration, Instant};
 
+const KEYBOARD_SHORTCUTS: &str = r"
+  ┌──────────┬──────────────────────────┐
+  │   Key    │         Description      │
+  ├──────────┼──────────────────────────┤
+  │ ESC/q    │ Quit                     │
+  │ SPACE    │ Pause/Resume             │
+  │ s        │ Sort frames              │
+  │ c        │ Clear frames             │
+  │ ↑ ↓      │ Scroll                   │
+  │ h        │ Toggle help (this popup) │
+  └──────────┴──────────────────────────┘
+";
+
 /// A CAN frame viewer for Linux `SocketCAN`
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(
+    author,
+    version,
+    about = "A CAN frame viewer for Linux `SocketCAN`",
+    long_about = None,
+    after_help = format!("Shortcuts:{KEYBOARD_SHORTCUTS}"),
+)]
 #[clap(styles = style::CARGO_STYLING)]
 struct Args {
     /// CAN interface to use
@@ -224,18 +243,17 @@ impl App {
 
     fn draw_shortcuts_popup(frame: &mut AppFrame) {
         // Create the shortcuts content with proper table formatting
-        let lines = vec![
-            Line::from("┌──────────┬──────────────────────────┐"),
-            Line::from("│   Key    │         Description      │").bold(),
-            Line::from("├──────────┼──────────────────────────┤"),
-            Line::from("│ ESC/q    │ Quit                     │"),
-            Line::from("│ SPACE    │ Pause/Resume             │"),
-            Line::from("│ s        │ Sort frames              │"),
-            Line::from("│ c        │ Clear frames             │"),
-            Line::from("│ ↑ ↓      │ Scroll                   │"),
-            Line::from("│ h        │ Toggle help (this popup) │"),
-            Line::from("└──────────┴──────────────────────────┘"),
-        ];
+        let mut lines = Vec::new();
+        for line in KEYBOARD_SHORTCUTS.lines() {
+            if line.trim().is_empty() {
+                continue; // Skip empty lines
+            }
+            if line.contains("Description") {
+                lines.push(Line::from(line.trim()).bold());
+            } else {
+                lines.push(Line::from(line.trim()));
+            }
+        }
 
         // Calculate exact dimensions needed
         let content_width = u16::try_from(lines[0].width()).unwrap();
