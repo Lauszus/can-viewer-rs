@@ -110,8 +110,10 @@ impl App {
                             if !self.paused {
                                 let current_time = self.start_time.elapsed().as_secs_f64();
                                 let frame_id = frame.can_id().as_raw();
+                                let frame_len = frame.len();
 
-                                if let Some((_, stats)) = self.frame_stats.iter_mut().find(|(id, _)| *id == frame_id) {
+                                // Frames are considered the same if they have the same ID and length
+                                if let Some((_, stats)) = self.frame_stats.iter_mut().find(|(id, s)| *id == frame_id && s.last_frame.len() == frame_len) {
                                     let dt = current_time - stats.last_time;
                                     stats.count += 1;
                                     stats.last_dt = dt;
