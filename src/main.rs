@@ -163,7 +163,13 @@ impl App {
                 stats.last_frame.dlc(),
                 data_hex
             );
-            lines.push(Line::from(line_text));
+
+            // Highlight error frames in red
+            if stats.last_frame.is_error_frame() {
+                lines.push(Line::from(line_text.red()));
+            } else {
+                lines.push(Line::from(line_text));
+            }
         }
 
         frame.render_widget(
