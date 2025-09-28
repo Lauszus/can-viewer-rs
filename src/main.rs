@@ -190,7 +190,9 @@ impl App {
                 self.paused = !self.paused;
             }
             (_, KeyCode::Char('s' | 'S')) => {
-                self.frame_stats.sort_by_key(|(id, _)| *id);
+                // Split standard and extended frames into two groups and sort by ID within each group
+                self.frame_stats
+                    .sort_by_key(|(id, stats)| (stats.last_frame.is_extended(), *id));
             }
             (_, KeyCode::Char('c' | 'C')) => {
                 self.frame_stats.clear();
