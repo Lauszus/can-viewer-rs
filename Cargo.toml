@@ -8,6 +8,7 @@ color-eyre = "0.6.5"
 colored = "3.0.0"
 crossterm = { version = "0.29.0", features = ["event-stream"] }
 futures = "0.3.31"
+indexmap = "2.11.4"
 ratatui = {  version = "0.29.0" }
 socketcan = { version = "3.5.0", features = ["tokio"] }
 tokio = { version = "1.47.1", features = ["full"] }

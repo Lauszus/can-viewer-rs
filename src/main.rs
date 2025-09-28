@@ -2,6 +2,7 @@ use color_eyre::Result;
 use colored::Colorize;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use futures::{FutureExt, StreamExt};
+use indexmap::IndexMap;
 use ratatui::{DefaultTerminal, Frame as AppFrame, style::Stylize, text::Line, widgets::Paragraph};
 use socketcan::tokio::CanSocket;
 use socketcan::{CanFrame, EmbeddedFrame, Frame};
@@ -21,9 +22,9 @@ async fn main() -> Result<()> {
 #[derive(Debug, Clone)]
 struct FrameStats {
     count: u32,
+    dt: f64,
     last_time: f64,
-    last_dt: f64,
-    last_frame: CanFrame,
+    frame: CanFrame,
 }
 
 #[derive(Debug)]
@@ -32,7 +33,7 @@ pub struct App {
     paused: bool,
     event_stream: EventStream,
     can_socket: CanSocket,
-    frame_stats: Vec<(u32, FrameStats)>,
+    frame_stats: IndexMap<(u32, usize), FrameStats>,
     start_time: Instant,
     frame_rate: f64,
 }
@@ -73,7 +74,7 @@ impl App {
             paused: false,
             event_stream: EventStream::new(),
             can_socket,
-            frame_stats: Vec::new(),
+            frame_stats: IndexMap::new(),
             start_time: Instant::now(),
             frame_rate: 60.0, // 60 FPS
         })
@@ -109,23 +110,22 @@ impl App {
                         Ok(frame) => {
                             if !self.paused {
                                 let current_time = self.start_time.elapsed().as_secs_f64();
-                                let frame_id = frame.can_id().as_raw();
+                                let frame_id = frame.id_word();
                                 let frame_len = frame.len();
 
                                 // Frames are considered the same if they have the same ID and length
-                                if let Some((_, stats)) = self.frame_stats.iter_mut().find(|(id, s)| *id == frame_id && s.last_frame.len() == frame_len) {
-                                    let dt = current_time - stats.last_time;
+                                if let Some(stats) = self.frame_stats.get_mut(&(frame_id, frame_len)) {
                                     stats.count += 1;
-                                    stats.last_dt = dt;
+                                    stats.dt = current_time - stats.last_time;
                                     stats.last_time = current_time;
-                                    stats.last_frame = frame;
+                                    stats.frame = frame;
                                 } else {
-                                    self.frame_stats.push((frame_id, FrameStats {
+                                   self.frame_stats.insert((frame_id, frame_len), FrameStats {
                                         count: 1,
+                                        dt: 0.0,
                                         last_time: current_time,
-                                        last_dt: 0.0,
-                                        last_frame: frame,
-                                    }));
+                                        frame,
+                                    });
                                 }
                             }
                         }
@@ -143,9 +143,10 @@ impl App {
         let header = Line::from("Count   Time           dt          ID          DLC  Data").bold();
         let mut lines = vec![header];
 
-        for (id, stats) in &self.frame_stats {
+        for stats in self.frame_stats.values() {
+            let id = stats.frame.can_id().as_raw();
             let data_hex = stats
-                .last_frame
+                .frame
                 .data()
                 .iter()
                 .map(|b| format!("{b:02X}"))
@@ -156,18 +157,18 @@ impl App {
                 "{:<7} {:<14.6} {:<11.6} {:<11} {:<4} {}",
                 stats.count,
                 stats.last_time,
-                stats.last_dt,
-                if stats.last_frame.is_extended() {
+                stats.dt,
+                if stats.frame.is_extended() {
                     format!("0x{id:08X}")
                 } else {
                     format!("0x{id:03X}")
                 },
-                stats.last_frame.dlc(),
+                stats.frame.len(),
                 data_hex
             );
 
             // Highlight error frames in red
-            if stats.last_frame.is_error_frame() {
+            if stats.frame.is_error_frame() {
                 lines.push(Line::from(line_text.red()));
             } else {
                 lines.push(Line::from(line_text));
@@ -192,9 +193,9 @@ impl App {
                 self.paused = !self.paused;
             }
             (_, KeyCode::Char('s' | 'S')) => {
-                // Split standard and extended frames into two groups and sort by ID within each group
-                self.frame_stats
-                    .sort_by_key(|(id, stats)| (stats.last_frame.is_extended(), *id));
+                // Note this is sorted by the "id_word" (canid_t), which includes the EFF/RTR/ERR flags
+                // This means standard frames (0x000 to 0x7FF) will be sorted before extended frames
+                self.frame_stats.sort_by_key(|(id, _), _| *id);
             }
             (_, KeyCode::Char('c' | 'C')) => {
                 self.frame_stats.clear();
