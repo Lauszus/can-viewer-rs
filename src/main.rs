@@ -26,6 +26,7 @@ const KEYBOARD_SHORTCUTS: &str = r"
   │ s        │ Sort frames              │
   │ c        │ Clear frames             │
   │ ↑↓       │ Scroll                   │
+  │ PgUp/Dn  │ Scroll page              │
   │ h        │ Toggle help (this popup) │
   └──────────┴──────────────────────────┘
 ";
@@ -109,7 +110,8 @@ pub struct App {
     frame_stats: IndexMap<(u32, usize), FrameStats>,
     start_time: Instant,
     frame_rate: f64,
-    scroll_offset: u16, // Track scroll position
+    scroll_offset: u16,   // Track scroll position
+    terminal_height: u16, // Track terminal height for page scrolling
 }
 
 impl App {
@@ -125,6 +127,7 @@ impl App {
             start_time: Instant::now(),
             frame_rate: 60.0, // 60 FPS
             scroll_offset: 0,
+            terminal_height: 0,
         }
     }
 
@@ -188,6 +191,9 @@ impl App {
     }
 
     fn draw(&mut self, frame: &mut AppFrame) {
+        // Update terminal height for page scrolling
+        self.terminal_height = frame.area().height;
+
         let header = Line::from("Count   Time           dt          ID          DLC  Data").bold();
         let mut lines = vec![header];
 
@@ -305,6 +311,16 @@ impl App {
             }
             (_, KeyCode::Down) => {
                 self.scroll_offset += 1;
+            }
+            (_, KeyCode::PageUp) => {
+                // Scroll up by a page - 1
+                let page_size = self.terminal_height.saturating_sub(1);
+                self.scroll_offset = self.scroll_offset.saturating_sub(page_size);
+            }
+            (_, KeyCode::PageDown) => {
+                // Scroll down by a page - 1
+                let page_size = self.terminal_height.saturating_sub(1);
+                self.scroll_offset = self.scroll_offset.saturating_add(page_size);
             }
             (_, KeyCode::Esc | KeyCode::Char('q'))
             | (KeyModifiers::CONTROL, KeyCode::Char('c' | 'C')) => self.quit(),
