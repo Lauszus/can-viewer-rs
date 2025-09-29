@@ -1,3 +1,4 @@
 /target
 .idea/
-can-viewer-rs.zip
+can-viewer-rs-*.zip
+SHA256SUMS

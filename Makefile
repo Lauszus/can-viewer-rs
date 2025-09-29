@@ -1,4 +1,4 @@
-.PHONY: cargo build-debug build-release check check-clippy check-fmt clean fix fix-clippy fix-fmt lock lock-upgrade run test
+.PHONY: run cargo target-x86_64-unknown-linux-musl target-armv7-unknown-linux-musleabihf build-debug build-release build-release-armv7 publish publish-dry-run check check-clippy check-fmt clean fix fix-clippy fix-fmt lock lock-upgrade test
 
 # This is the first target, so it is run if "make" is called without arguments.
 run: $(CARGO)
@@ -24,12 +24,20 @@ target-x86_64-unknown-linux-musl: $(CARGO)
 	  $(RUSTUP) target add x86_64-unknown-linux-musl; \
 	fi
 
+target-armv7-unknown-linux-musleabihf: $(CARGO)
+	if ! $(RUSTUP) target list | grep -q 'armv7-unknown-linux-musleabihf (installed)'; then \
+	  $(RUSTUP) target add armv7-unknown-linux-musleabihf; \
+	fi
+
 # Build the project for the x86_64-unknown-linux-musl target.
 build-debug: $(CARGO) target-x86_64-unknown-linux-musl
 	$(CARGO) build --target x86_64-unknown-linux-musl
 
 build-release: $(CARGO) target-x86_64-unknown-linux-musl
 	$(CARGO) build --target x86_64-unknown-linux-musl --locked --release
+
+build-release-armv7: $(CARGO) target-armv7-unknown-linux-musleabihf
+	$(CARGO) build --target armv7-unknown-linux-musleabihf --locked --release
 
 # Publish the crate to crates.io.
 publish: $(CARGO)

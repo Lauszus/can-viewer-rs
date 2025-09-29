@@ -1,4 +1,3 @@
-/** Copyright (C) Candela Technology AB, 2025 */
 // Source: https://github.com/crate-ci/clap-cargo/blob/master/src/style.rs
 use clap::builder::styling::{AnsiColor, Effects, Style};
 
