@@ -1,6 +1,6 @@
 [package]
 name = "can-viewer-rs"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Kristian Sloth Lauszus <lauszus@gmail.com>"]
 edition = "2024"
 description = "A terminal-based CAN bus viewer for Linux SocketCAN written in Rust."
