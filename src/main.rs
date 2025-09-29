@@ -68,22 +68,24 @@ fn open_can_socket(channel: &String) -> CanSocket {
             eprintln!(
                 "{} '{}':",
                 Colorize::bold("Failed to open CAN interface").red(),
-                channel.clone().yellow()
+                Colorize::yellow(channel.as_str())
             );
-            eprintln!("  {}", e.to_string().red());
+            eprintln!("  - {e}");
             eprintln!();
             eprintln!("{}:", Colorize::bold("Please check that").cyan());
             eprintln!(
                 "  - The interface exists (try: {})",
-                format!("ip link show {channel}").green()
+                Colorize::green(format!("ip link show {channel}").as_str())
             );
             eprintln!("  - You have sufficient permissions");
             eprintln!(
                 "  - The interface is up: {}",
-                format!(
-                    "sudo ip link add dev {channel} type vcan && sudo ip link set up {channel}"
+                Colorize::green(
+                    format!(
+                        "sudo ip link add dev {channel} type vcan && sudo ip link set up {channel}"
+                    )
+                    .as_str()
                 )
-                .green()
             );
             std::process::exit(1);
         }
