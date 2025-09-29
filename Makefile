@@ -7,6 +7,9 @@ run: $(CARGO)
 # Path to cargo.
 CARGO ?= $(shell which cargo 2>/dev/null || echo "$(HOME)/.cargo/bin/cargo")
 
+# Path to rustup.
+RUSTUP ?= $(shell which rustup 2>/dev/null || echo "$(HOME)/.cargo/bin/rustup")
+
 # Target for installing uv.
 $(CARGO):
 	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -15,12 +18,27 @@ $(CARGO):
 # Install cargo.
 cargo: $(CARGO)
 
-build-debug: $(CARGO)
-	$(CARGO) build
+# Install the x86_64-unknown-linux-musl target if not already installed.
+target-x86_64-unknown-linux-musl: $(CARGO)
+	if ! $(RUSTUP) target list | grep -q 'x86_64-unknown-linux-musl (installed)'; then \
+	  $(RUSTUP) target add x86_64-unknown-linux-musl; \
+	fi
 
-build-release: $(CARGO)
-	$(CARGO) build --release
+# Build the project for the x86_64-unknown-linux-musl target.
+build-debug: $(CARGO) target-x86_64-unknown-linux-musl
+	$(CARGO) build --target x86_64-unknown-linux-musl
 
+build-release: $(CARGO) target-x86_64-unknown-linux-musl
+	$(CARGO) build --target x86_64-unknown-linux-musl --locked --release
+
+# Publish the crate to crates.io.
+publish: $(CARGO)
+	$(CARGO) publish --locked
+
+publish-dry-run: $(CARGO)
+	$(CARGO) publish --locked --dry-run
+
+# Check formatting and clippy issues.
 check: check-fmt check-clippy
 
 check-clippy: $(CARGO)
@@ -32,6 +50,7 @@ check-fmt: $(CARGO)
 clean: $(CARGO)
 	$(CARGO) clean
 
+# Fix formatting and clippy issues.
 fix: fix-clippy fix-fmt
 
 fix-clippy: $(CARGO)
@@ -52,5 +71,6 @@ lock: Cargo.lock
 lock-upgrade: Cargo.lock
 	$(CARGO) generate-lockfile
 
+# Run tests.
 test: $(CARGO)
 	$(CARGO) test

@@ -1,7 +1,15 @@
 [package]
 name = "can-viewer-rs"
 version = "0.1.0"
+authors = ["Kristian Sloth Lauszus <lauszus@gmail.com>"]
 edition = "2024"
+description = "A terminal-based CAN bus viewer for Linux SocketCAN written in Rust."
+readme = "README.md"
+repository = "https://github.com/Lauszus/can-viewer-rs"
+license-file = "LICENSE"
+keywords = ["CAN", "socketcan", "viewer", "terminal", "tui"]
+categories = ["automotive", "command-line-utilities", "embedded"]
+exclude = ["/scripts"]
 
 [dependencies]
 clap = { version = "4.5.48", features = ["derive"] }
@@ -13,3 +21,7 @@ indexmap = "2.11.4"
 ratatui = {  version = "0.29.0" }
 socketcan = { version = "3.5.0", features = ["tokio"] }
 tokio = { version = "1.47.1", features = ["full"] }
+
+[profile.release]
+strip = true
+lto = "fat"

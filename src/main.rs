@@ -25,17 +25,16 @@ const KEYBOARD_SHORTCUTS: &str = r"
   │ SPACE    │ Pause/Resume             │
   │ s        │ Sort frames              │
   │ c        │ Clear frames             │
-  │ ↑ ↓      │ Scroll                   │
+  │ ↑↓       │ Scroll                   │
   │ h        │ Toggle help (this popup) │
   └──────────┴──────────────────────────┘
 ";
 
-/// A CAN frame viewer for Linux `SocketCAN`
 #[derive(Parser, Debug)]
 #[command(
     author,
     version,
-    about = "A CAN frame viewer for Linux `SocketCAN`",
+    about = "A terminal-based CAN bus viewer for Linux SocketCAN written in Rust",
     long_about = None,
     after_help = format!("Shortcuts:{KEYBOARD_SHORTCUTS}"),
 )]
