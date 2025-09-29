@@ -3,6 +3,7 @@
 #### Developed by Kristian Sloth Lauszus, 2025
 _________
 [![Crates.io](https://img.shields.io/crates/v/can-viewer-rs.svg)](https://crates.io/crates/can-viewer-rs)
+[![PyPI](https://img.shields.io/pypi/v/can-viewer-rs.svg)](https://pypi.org/project/can-viewer-rs)
 [![CI](https://github.com/Lauszus/can-viewer-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Lauszus/can-viewer-rs/actions/workflows/ci.yml)
 
 A terminal-based CAN bus viewer for Linux SocketCAN written in Rust.
