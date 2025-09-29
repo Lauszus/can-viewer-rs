@@ -1,4 +1,4 @@
-.PHONY: run cargo target-x86_64-unknown-linux-musl target-armv7-unknown-linux-musleabihf build-debug build-release build-release-armv7 publish publish-dry-run check check-clippy check-fmt clean fix fix-clippy fix-fmt lock lock-upgrade test
+.PHONY: run cargo target-x86_64-unknown-linux-musl target-armv7-unknown-linux-musleabihf build-debug build-release build-release-armv7 publish publish-dry-run check check-clippy check-fmt clean fix fix-clippy fix-fmt lock lock-upgrade test sdist wheel
 
 # This is the first target, so it is run if "make" is called without arguments.
 run: $(CARGO)
@@ -82,3 +82,10 @@ lock-upgrade: Cargo.lock
 # Run tests.
 test: $(CARGO)
 	$(CARGO) test
+
+# Create source distribution and wheel.
+sdist:
+	docker run --rm -v $$(pwd):/io ghcr.io/pyo3/maturin sdist
+
+wheel:
+	docker run --rm -v $$(pwd):/io ghcr.io/pyo3/maturin build

@@ -1,4 +1,7 @@
 /target
-.idea/
+/binaries
+/.idea
 can-viewer-rs-*.zip
 SHA256SUMS
+/dist
+*.whl

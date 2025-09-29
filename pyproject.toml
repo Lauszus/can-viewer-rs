@@ -1,0 +1,22 @@
+[build-system]
+requires = ["maturin>=1.9,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "can-viewer-rs"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python",
+]
+dynamic = ["version"]
+
+[tool.maturin]
+profile = "release"
+locked = true
+bindings = "bin"
+strip = true
+
+[tool.uv]
+required-version = ">=0.8.13"

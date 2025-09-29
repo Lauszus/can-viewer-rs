@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -37,12 +38,82 @@ jobs:
       - name: Run checks
         run: make -j check
 
-  release:
-    name: Release
-    needs: check
+  wheels:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64
+          - runner: ubuntu-latest
+            target: x86
+          - runner: ubuntu-24.04-arm
+            target: aarch64
+          - runner: ubuntu-24.04-arm
+            target: armv7
+          - runner: ubuntu-latest
+            target: s390x
+          - runner: ubuntu-latest
+            target: ppc64le
+        manylinux: [auto, musllinux_1_2]
+        exclude:
+          - platform:
+              runner: ubuntu-latest
+              target: s390x
+            manylinux: musllinux_1_2
+          - platform:
+              runner: ubuntu-latest
+              target: ppc64le
+            manylinux: musllinux_1_2
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          manylinux: ${{ matrix.manylinux }}
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-wheel-${{ matrix.manylinux == 'auto' && 'linux' || 'musllinux' }}-${{ matrix.platform.target }}-${{ github.sha }}
+          path: target/wheels
+          retention-days: 1
+          if-no-files-found: error
+
+  sdist:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-sdist-${{ github.sha }}
+          path: target/wheels
+          retention-days: 1
+          if-no-files-found: error
+
+  binaries:
+    name: Binaries
+    runs-on: ${{ matrix.runner }}
+    strategy:
+        matrix:
+            include:
+            - runner: ubuntu-latest
+              target: x86_64-unknown-linux-musl
+              make_cmd: build-release
+            - runner: ubuntu-24.04-arm
+              target: armv7-unknown-linux-musleabihf
+              make_cmd: build-release-armv7
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -53,8 +124,80 @@ jobs:
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
 
+      - name: Build release (${{ matrix.target }})
+        run: make -j ${{ matrix.make_cmd }}
+
+      - name: Package binary
+        run: |
+          # Zip the binary, so it does not lose its executable flag when uploaded to GitHub Releases
+          zip --junk-paths can-viewer-rs-${{ matrix.target }}.zip target/${{ matrix.target }}/release/can-viewer-rs
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            can-viewer-rs-*.zip
+          retention-days: 1
+          if-no-files-found: error
+
+  release:
+    name: Release
+    needs: [check, wheels, sdist, binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          cache-suffix: release
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
       - name: Login
         run: echo "${{ secrets.CARGO_REGISTRY_TOKEN }}" | cargo login
+
+      - name: Download dist
+        uses: actions/download-artifact@v5
+        with:
+          path: dist
+          pattern: dist-*
+          merge-multiple: true
+
+      - name: Download binaries
+        uses: actions/download-artifact@v5
+        with:
+          path: binaries
+          pattern: binaries-*
+          merge-multiple: true
+
+      - name: Calculate checksums
+        run: |
+          pushd dist
+            sha256sum * > ../SHA256SUMS
+          popd
+          pushd binaries
+            sha256sum * >> ../SHA256SUMS
+          popd
+          cat SHA256SUMS
+
+      - name: Check dist
+        id: twine
+        run: uvx twine check dist/*
+
+      - name: Publish to PyPI
+        id: pypi
+        if: ${{ ! cancelled() && steps.twine.conclusion == 'success' && startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          uvx twine upload -u ${{ secrets.PYPI_USERNAME }} -p ${{ secrets.PYPI_PASSWORD }} dist/*
 
       - name: Publish (dry run)
         if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
@@ -62,40 +205,16 @@ jobs:
 
       - name: Publish
         id: publish
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        if: ${{ ! cancelled() && steps.pypi.conclusion == 'success' }}
         run: make -j publish
 
-      - name: Build release (x86_64-unknown-linux-musl)
-        run: make -j build-release
-
-      - name: Build release (armv7-unknown-linux-musleabihf)
-        run: make -j build-release-armv7
-
-      - name: Package binaries
-        run: |
-          # Zip the binary, so it does not loose its executable flag when uploaded to GitHub Releases
-          zip --junk-paths can-viewer-rs-x86_64-unknown-linux-musl.zip target/x86_64-unknown-linux-musl/release/can-viewer-rs
-          zip --junk-paths can-viewer-rs-armv7-unknown-linux-musleabihf.zip target/armv7-unknown-linux-musleabihf/release/can-viewer-rs
-          sha256sum can-viewer-rs-x86_64-unknown-linux-musl.zip > SHA256SUMS
-          sha256sum can-viewer-rs-armv7-unknown-linux-musleabihf.zip >> SHA256SUMS
-          cat SHA256SUMS
-
-      - name: Upload binaries
-        uses: actions/upload-artifact@v4
-        with:
-          name: binaries-${{ github.sha }}
-          path: |
-            can-viewer-rs-x86_64-unknown-linux-musl.zip
-            can-viewer-rs-armv7-unknown-linux-musleabihf.zip
-          retention-days: 1
-          if-no-files-found: error
-
       - name: Publish to Github Release
-        if: ${{ steps.publish.conclusion == 'success' }}
+        if: ${{ ! cancelled() && steps.publish.conclusion == 'success' }}
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            can-viewer-rs-*.zip
+            dist/*
+            binaries/*
             SHA256SUMS
           draft: true
           fail_on_unmatched_files: true
