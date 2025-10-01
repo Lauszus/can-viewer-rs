@@ -17,7 +17,7 @@ env:
 # and restart the workflow. See https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   check:
@@ -110,7 +110,7 @@ jobs:
             include:
             - runner: ubuntu-latest
               target: x86_64-unknown-linux-musl
-              make_cmd: build-release
+              make_cmd: build-release-x86_64
             - runner: ubuntu-24.04-arm
               target: armv7-unknown-linux-musleabihf
               make_cmd: build-release-armv7
