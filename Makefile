@@ -1,4 +1,11 @@
-.PHONY: run cargo target-x86_64-unknown-linux-musl target-armv7-unknown-linux-musleabihf build-debug build-release build-release-armv7 publish publish-dry-run check check-clippy check-fmt clean fix fix-clippy fix-fmt lock lock-upgrade test sdist wheel
+.PHONY: run cargo \
+			target-x86_64-unknown-linux-musl target-armv7-unknown-linux-musleabihf \
+			build-debug build-release-x86_64 build-release-armv7 \
+			publish publish-dry-run \
+			check check-clippy check-fmt clean \
+			fix fix-clippy fix-fmt \
+			lock lock-upgrade \
+			test sdist wheel
 
 # This is the first target, so it is run if "make" is called without arguments.
 run: $(CARGO)
@@ -18,22 +25,24 @@ $(CARGO):
 # Install cargo.
 cargo: $(CARGO)
 
-# Install the x86_64-unknown-linux-musl target if not already installed.
-target-x86_64-unknown-linux-musl: $(CARGO)
-	if ! $(RUSTUP) target list | grep -q 'x86_64-unknown-linux-musl (installed)'; then \
-	  $(RUSTUP) target add x86_64-unknown-linux-musl; \
+# Generic macro to install a Rust target if not already installed.
+define install-rust-target
+	if ! $(RUSTUP) target list | grep -q '$(1) (installed)'; then \
+	  $(RUSTUP) target add $(1); \
 	fi
+endef
+
+target-x86_64-unknown-linux-musl: $(CARGO)
+	$(call install-rust-target,x86_64-unknown-linux-musl)
 
 target-armv7-unknown-linux-musleabihf: $(CARGO)
-	if ! $(RUSTUP) target list | grep -q 'armv7-unknown-linux-musleabihf (installed)'; then \
-	  $(RUSTUP) target add armv7-unknown-linux-musleabihf; \
-	fi
+	$(call install-rust-target,armv7-unknown-linux-musleabihf)
 
-# Build the project for the x86_64-unknown-linux-musl target.
-build-debug: $(CARGO) target-x86_64-unknown-linux-musl
-	$(CARGO) build --target x86_64-unknown-linux-musl
+# Build the project.
+build-debug: $(CARGO)
+	$(CARGO) build
 
-build-release: $(CARGO) target-x86_64-unknown-linux-musl
+build-release-x86_64: $(CARGO) target-x86_64-unknown-linux-musl
 	$(CARGO) build --target x86_64-unknown-linux-musl --locked --release
 
 build-release-armv7: $(CARGO) target-armv7-unknown-linux-musleabihf
